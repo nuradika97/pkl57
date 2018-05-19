@@ -1,0 +1,1 @@
+ - <a id="tombolfaq" data-toggle="modal" data-target="#tambah-data" class="btn" style="background-color: #1a237e; color:white;">Tambah FAQ</a>

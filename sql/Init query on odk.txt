@@ -1,0 +1,169 @@
+#detail_listing
+CREATE TABLE detail_listing AS
+(
+SELECT t1.nim, t1.kode_bs, t1.kode_desa, t1.nama_desa, t1.kode_kecamatan, t1.nama_kecamatan, t1.kode_kabupaten, t1.nama_kabupaten, t2.jumlah
+		FROM
+		(SELECT dkb.id as kode_bs, dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten, dkb.nim
+		FROM pkl_odk_real.dummy_kode_bloksensus dkb
+		INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten WHERE dkk.id <> '99' ) t1
+		LEFT OUTER JOIN
+		(SELECT COUNT(*) as jumlah, kodeBs FROM pkl_odk_real.backup_datart GROUP BY kodeBs ) t2
+		ON t1.kode_bs = t2.kodeBs
+)
+
+
+
+#log_kuesioner
+CREATE TABLE logging_kuesioner as (
+    	SELECT DISTINCT(n.unique_id_instance) as unique_id_instance, n._id, n.UploadName, n.status, n.time , sm1.nama as nama_pcl , sm2.nama as nama_kortim
+    	FROM pkl_odk_real.VKD_PKL56_RT_V1_CORE ks
+    		JOIN pkl_kortimpcl_real.notif n ON  n.unique_id_instance = ks._URI 
+    		JOIN pkl_sipadu_real.sipadu_mahasiswa sm1 ON sm1.nim = n.nim
+    		JOIN pkl_sipadu_real.sipadu_mahasiswa sm2 ON sm2.nim = n.kortim
+    		order by _id DESC
+    		LIMIT 0,100
+)
+
+#agregat_listing_kab
+CREATE TABLE agregat_listing_kab AS        	
+                (SELECT t4.kode_kabupaten, t4.nama_kabupaten, t4.kode_kecamatan , t4.nama_kecamatan,t4.jumlah, t5.progress
+        	FROM(
+			SELECT *
+		FROM (
+			SELECT t1.kode_kabupaten, t1.nama_kabupaten, t1.kode_kecamatan , t1.nama_kecamatan,t2.jumlah
+			FROM
+			(SELECT dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten
+			FROM pkl_odk_real.dummy_kode_bloksensus dkb
+			INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+			INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+			INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten
+			GROUP BY kode_kabupaten
+			) t1
+			 INNER JOIN
+			(SELECT COUNT(*) as jumlah, SUBSTRING(kodeBs,3,2) as kode_kabupaten, SUBSTRING(kodeBS,5,3) as kode_kecamatan
+			FROM pkl_odk_real.backup_datart drt
+			GROUP BY kode_kabupaten
+			) t2
+			ON t1.kode_kabupaten = t2.kode_kabupaten) t3
+			)t4
+			join(
+			select kode_kabupaten, round(progress *100, 2) as progress
+			from pkl57_monitoring.agregat_cacah) t5
+			on t4.kode_kabupaten = t5.kode_kabupaten)
+
+#agregat_listing_kec
+CREATE TABLE agregat_listing_kec AS        	
+                (SELECT t4.kode_kabupaten, t4.nama_kabupaten, t4.kode_kecamatan , t4.nama_kecamatan,t4.jumlah, t5.progress
+        	FROM(
+			SELECT *
+		FROM (
+			SELECT t1.kode_kabupaten, t1.nama_kabupaten, t1.kode_kecamatan , t1.nama_kecamatan,t2.jumlah
+			FROM
+			(SELECT dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten
+			FROM pkl_odk_real.dummy_kode_bloksensus dkb
+			INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+			INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+			INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten
+			GROUP BY kode_kecamatan
+			) t1
+			 INNER JOIN
+			(SELECT COUNT(*) as jumlah, SUBSTRING(kodeBs,3,2) as kode_kabupaten, SUBSTRING(kodeBS,5,3) as kode_kecamatan
+			FROM pkl_odk_real.backup_datart drt
+			GROUP BY kode_kecamatan
+			) t2
+			ON t1.kode_kecamatan = t2.kode_kecamatan) t3
+			)t4
+			
+#agregat cacah
+CREATE TABLE agregat_cacah AS
+(
+SELECT t1.kode_kabupaten, t1.nama_kabupaten, t2.jumlah, t1.beban_cacah, t2.jumlah/t1.beban_cacah as progress
+		FROM
+		(SELECT dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten, SUM(dkb.beban_cacah) as beban_cacah
+		FROM pkl_odk_real.dummy_kode_bloksensus dkb
+		INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten
+		WHERE dkk.id <> '99'
+		GROUP BY kode_kabupaten
+		) t1
+		LEFT OUTER JOIN
+		(SELECT COUNT(DISTINCT(n.UploadName)) as jumlah, ks.BLOK1_B1_2 as kode_kabupaten
+		FROM pkl_odk_real.VKD_PKL56_RT_V1_CORE ks
+ 		INNER JOIN pkl_kortimpcl_real.notif n ON n.unique_id_instance = ks._URI
+		WHERE n.status_isian = 'Clear' AND n.status = 'Final' AND n.form_id = 'VKD.PKL56.RT.v1'
+		GROUP BY ks.BLOK1_B1_2
+		) t2
+		ON t1.kode_kabupaten = t2.kode_kabupaten
+)
+
+#detail_cacah
+CREATE TABLE detail_cacah AS
+(		SELECT t1.nim ,t1.nama, t1.nama_bs, t1.kode_desa, t1.nama_desa, t1.kode_kecamatan, t1.nama_kecamatan, t1.kode_kabupaten, t1.nama_kabupaten, t2.jumlah, t1.beban_cacah, t2.jumlah/t1.beban_cacah as progress, CONCAT(t1.nama_tim, '_', t1.nama_koor) as tim_koor
+		FROM
+		(SELECT dkb.nim, dkb.id as kode_bs, dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten, dkb.beban_cacah, sm.nama, st.nama_tim, sm2.nama as nama_koor
+		FROM pkl_odk_real.dummy_kode_bloksensus dkb
+		INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten
+		INNER JOIN pkl_sipadu_real.sipadu_mahasiswa sm ON sm.nim = dkb.nim
+		INNER JOIN pkl_sipadu_real.sipadu_timpencacah st ON st.id_tim = sm.id_tim
+		INNER JOIN pkl_sipadu_real.sipadu_mahasiswa sm2 ON sm2.nim = st.nim_koor
+		WHERE 1) t1
+		LEFT OUTER JOIN
+		(SELECT COUNT(DISTINCT(n.unique_id_instance)) as jumlah, n.nim, SUBSTRING(n.UploadName,4,2) as kode_kabupaten, SUBSTRING(n.UploadName,7,3) as kode_kecamatan, SUBSTRING(n.UploadName,11,3) as kode_desa, SUBSTRING(n.UploadName,15,4) as nama_bs, SUBSTRING(n.UploadName,1,18) as bs
+ 		FROM pkl_kortimpcl_real.notif n
+		WHERE n.status_isian = 'Clear' AND n.status = 'Final'
+ 		GROUP BY bs) t2
+ 		ON t1.kode_kabupaten = t2.kode_kabupaten AND t1.kode_kecamatan = t2.kode_kecamatan AND t1.kode_desa = t2.kode_desa AND t1.nama_bs = t2.nama_bs
+		WHERE t1.kode_kabupaten <> '99')
+
+#tabel_pcl
+CREATE TABLE tabel_pcl AS
+		(SELECT t1.nim, t2.nama, t2.nama_koor as kortim, GROUP_CONCAT(t1.kode_bs) as wilayah_kerja, t1.kode_desa, t1.nama_desa, t1.kode_kecamatan, t1.nama_kecamatan, t1.kode_kabupaten,	t1.nama_kabupaten, SUM(t3.jumlah) as jumlah, SUM(t1.beban_cacah) as beban_cacah, SUM(t3.jumlah / t1.beban_cacah) as progress
+		FROM
+			(
+				SELECT dkb.id as kode_bs, dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten,	dkb.beban_cacah, dkb.nim
+				FROM pkl_odk_real.dummy_kode_bloksensus dkb
+					INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan	AND dkd.kabupaten = dkb.kabupaten
+					INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+					INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten
+			) t1
+			INNER JOIN (
+				SELECT sm.nama,	sm.nim, st.nim_koor, sm1.nama as nama_koor
+				FROM pkl_sipadu_real.sipadu_mahasiswa sm
+					INNER JOIN pkl_sipadu_real.sipadu_timpencacah st ON sm.id_tim = st.id_tim
+					INNER JOIN pkl_sipadu_real.sipadu_mahasiswa sm1 ON st.nim_koor = sm1.nim
+				WHERE
+					sm.nim <> st.nim_koor
+			) t2 ON t1.nim = t2.nim
+			LEFT OUTER JOIN (
+				SELECT
+					COUNT(DISTINCT(n.unique_id_instance)) as jumlah, n.nim,	ks.BLOK1_GROUP1_B1_6 as nama_bs, ks.BLOK1_B1_4 kode_desa, ks.BLOK1_B1_3 as kode_kecamatan, ks.BLOK1_B1_2 as kode_kabupaten
+		 		FROM
+					pkl_odk_real.VKD_PKL56_RT_V1_CORE ks
+					INNER JOIN pkl_kortimpcl_real.notif n ON n.unique_id_instance = ks._URI
+				WHERE
+					n.status_isian = 'Clear' AND n.status = 'Final'	AND n.form_id = 'vsenpkl56_15.1_beta'
+				GROUP BY
+					ks.BLOK1_GROUP1_B1_6
+			) t3 ON t1.kode_kabupaten = t3.kode_kabupaten AND t1.kode_kecamatan = t3.kode_kecamatan	AND t1.kode_desa = t3.kode_desa	AND t1.nama_bs = t3.nama_bs	AND t1.nim = t3.nim
+		GROUP BY t1.nim)
+
+#TABEL_UNIT_CACAH
+CREATE TABLE tabel_unit_cacah AS
+(
+        	SELECT t1.nim, t1.kode_bs, t1.nama_bs, t1.nama_desa, t1.nama_kecamatan, t1.nama_kabupaten, t2.*
+		FROM
+		(SELECT dkb.id as kode_bs, dkb.nama as nama_bs, dkd.id as kode_desa, dkd.nama as nama_desa, dkc.id as kode_kecamatan, dkc.nama as nama_kecamatan, dkk.id as kode_kabupaten, dkk.nama as nama_kabupaten, dkb.nim
+		FROM pkl_odk_real.dummy_kode_bloksensus dkb
+		INNER JOIN pkl_odk_real.dummy_kode_kelurahandesa dkd ON dkd.id = dkb.kelurahandesa AND dkd.kecamatan = dkb.kecamatan AND dkd.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kecamatan dkc ON dkc.id = dkb.kecamatan AND dkc.kabupaten = dkb.kabupaten
+		INNER JOIN pkl_odk_real.dummy_kode_kabupaten dkk ON dkk.id = dkb.kabupaten) t1
+		INNER JOIN
+		(SELECT drt.* FROM pkl_odk_real.backup_datart drt
+		INNER JOIN pkl_odk_real.backup_datast dst ON dst.kodeRuta = drt.kodeRuta AND dst.kodeBs = drt.kodeBs) t2
+		ON t1.kode_bs = t2.kodeBs  
+)
